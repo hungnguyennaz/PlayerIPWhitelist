@@ -1,0 +1,8 @@
+mysql:
+  hostname: "YOUR_MYSQL_HOSTNAME"
+  port: 3306 # Change this if your MySQL host uses a different port.
+  database: "YOUR_DATABASE"
+  username: "YOUR_MYSQL_USERNAME"
+  password: "YOUR_MYSQL_PASSWORD"
+
+kick-message: "Your IP isn't whitelisted nigge-."

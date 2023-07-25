@@ -5,6 +5,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -33,12 +35,15 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     }
 
     private void loadConfig() {
+        getConfig().options().copyDefaults(true);
+        saveDefaultConfig();
+
         mysqlHostname = getConfig().getString("mysql.hostname");
         mysqlPort = getConfig().getInt("mysql.port");
         mysqlDatabase = getConfig().getString("mysql.database");
         mysqlUsername = getConfig().getString("mysql.username");
         mysqlPassword = getConfig().getString("mysql.password");
-        kickMessage = getConfig().getString("kick-message", "Your IP is not whitelisted.");
+        kickMessage = getConfig().getString("kick-message", "Mày là thằng nào?!");
     }
 
     private boolean testMySQLConnection() {
@@ -71,6 +76,10 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     @EventHandler
     public void onAsyncPlayerPreLogin(AsyncPlayerPreLoginEvent event) {
         String ipAddress = event.getAddress().getHostAddress();
+        if (isLocalIP(ipAddress)) {
+            return;
+        }
+
         boolean isWhitelisted = checkWhitelist(ipAddress);
         if (!isWhitelisted) {
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, kickMessage);
@@ -95,5 +104,14 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
             e.printStackTrace();
         }
         return false;
+    }
+
+    private boolean isLocalIP(String ipAddress) {
+        try {
+            InetAddress addr = InetAddress.getByName(ipAddress);
+            return addr.isLoopbackAddress() || addr.isSiteLocalAddress();
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 }

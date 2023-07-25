@@ -5,14 +5,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.*;
+import java.util.Scanner;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     private String mysqlHostname;
@@ -35,9 +35,6 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     }
 
     private void loadConfig() {
-        getConfig().options().copyDefaults(true);
-        saveDefaultConfig();
-
         mysqlHostname = getConfig().getString("mysql.hostname");
         mysqlPort = getConfig().getInt("mysql.port");
         mysqlDatabase = getConfig().getString("mysql.database");
@@ -75,16 +72,38 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onAsyncPlayerPreLogin(AsyncPlayerPreLoginEvent event) {
-        String ipAddress = event.getAddress().getHostAddress();
-        if (isLocalIP(ipAddress)) {
+        String publicIPAddress = getPublicIPAddress();
+        if (publicIPAddress == null) {
+            getLogger().warning("Failed to retrieve public IP from ipify API.");
             return;
         }
 
-        boolean isWhitelisted = checkWhitelist(ipAddress);
+        boolean isWhitelisted = checkWhitelist(publicIPAddress);
         if (!isWhitelisted) {
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, kickMessage);
-            getLogger().warning("IP " + ipAddress + " tried to join, but not whitelisted.");
+            getLogger().warning("IP " + publicIPAddress + " tried to join, but not whitelisted.");
         }
+    }
+
+    private String getPublicIPAddress() {
+        try {
+            URL url = new URL("https://api.ipify.org?format=json");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+
+            if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                try (Scanner scanner = new Scanner(conn.getInputStream())) {
+                    String response = scanner.useDelimiter("\\A").next();
+                    JsonObject jsonObject = JsonParser.parseString(response).getAsJsonObject();
+                    return jsonObject.get("ip").getAsString();
+                }
+            } else {
+                getLogger().warning("Failed to retrieve public IP. HTTP response code: " + conn.getResponseCode());
+            }
+        } catch (IOException e) {
+            getLogger().warning("Failed to retrieve public IP. Error: " + e.getMessage());
+        }
+        return null;
     }
 
     private boolean checkWhitelist(String ipAddress) {
@@ -104,14 +123,5 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
             e.printStackTrace();
         }
         return false;
-    }
-
-    private boolean isLocalIP(String ipAddress) {
-        try {
-            InetAddress addr = InetAddress.getByName(ipAddress);
-            return addr.isLoopbackAddress() || addr.isSiteLocalAddress();
-        } catch (UnknownHostException e) {
-            return false;
-        }
     }
 }

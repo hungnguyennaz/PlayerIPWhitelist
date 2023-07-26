@@ -17,7 +17,7 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     private String kickMessage; // Kick message
 
     // HashMap to store cached results of whitelisted IP addresses
-    private HashMap<String, Long> whitelistCache = new HashMap<>();
+    private final HashMap<String, CacheEntry> whitelistCache = new HashMap<>();
     private int cacheExpiration; // Cache expiration time in seconds
 
     @Override
@@ -45,6 +45,24 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
         mysqlPassword = getConfig().getString("mysql.password");
         kickMessage = getConfig().getString("kick-message", "Mày là thằng nào?!"); // Kick message
         cacheExpiration = getConfig().getInt("cache-expiration", 300); // Cache expiration
+    }
+
+    private static class CacheEntry {
+        private final boolean isWhitelisted;
+        private final long timestamp;
+
+        public CacheEntry(boolean isWhitelisted, long timestamp) {
+            this.isWhitelisted = isWhitelisted;
+            this.timestamp = timestamp;
+        }
+
+        public boolean isWhitelisted() {
+            return isWhitelisted;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
     }
 
     private boolean testMySQLConnection() {
@@ -89,10 +107,11 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
     private boolean checkWhitelist(String ipAddress) {
         // Check if the result is already cached and not expired
         if (whitelistCache.containsKey(ipAddress)) {
+            CacheEntry entry = whitelistCache.get(ipAddress);
             long currentTime = System.currentTimeMillis();
-            long cacheTime = whitelistCache.get(ipAddress);
-            if (cacheTime + (cacheExpiration * 1000) > currentTime) {
-                return true;
+            long cacheTime = entry.getTimestamp();
+            if (cacheTime + (cacheExpiration * 1000L) > currentTime) {
+                return entry.isWhitelisted();
             }
         }
 
@@ -107,7 +126,7 @@ public class PlayerIPWhitelist extends JavaPlugin implements Listener {
                     if (resultSet.next()) {
                         boolean isWhitelisted = resultSet.getInt(1) > 0;
                         // Cache the result with the current timestamp
-                        whitelistCache.put(ipAddress, System.currentTimeMillis());
+                        whitelistCache.put(ipAddress, new CacheEntry(isWhitelisted, System.currentTimeMillis()));
                         return isWhitelisted;
                     }
                 }

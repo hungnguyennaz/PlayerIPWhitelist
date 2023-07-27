@@ -8,3 +8,6 @@ mysql:
 # Joins handling
 cache-expiration: 300 # In seconds
 kick-message: "Mày là thằng nào?!"
+do-not-ignore-local-ip:
+  enabled: false
+  log-ignored-local-ip: true
